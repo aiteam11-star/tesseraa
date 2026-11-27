@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Palette: warm off-white and deep ink, one accent (verdigris). */
+:root {
+  --bg: 246 243 236;
+  --surface: 252 250 246;
+  --sunken: 237 233 224;
+  --ink: 20 24 31;
+  --muted: 88 96 110;
+  --line: 214 208 195;
+  --accent: 9 120 108;
+  --accent-strong: 6 98 88;
+  --on-accent: 255 255 255;
+  --warn: 150 84 0;
+  --risk: 176 36 28;
+  --font-display: "Instrument Serif", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --font-body: "Instrument Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: light;
+}
+.dark {
+  --bg: 15 19 24;
+  --surface: 23 28 35;
+  --sunken: 11 14 18;
+  --ink: 236 233 225;
+  --muted: 160 169 181;
+  --line: 44 52 63;
+  --accent: 63 207 184;
+  --accent-strong: 96 224 203;
+  --on-accent: 5 33 29;
+  --warn: 242 180 80;
+  --risk: 255 142 132;
+  color-scheme: dark;
+}
+
+@layer base {
+  html { scroll-behavior: smooth; }
+  body { @apply bg-bg text-ink font-sans antialiased; font-variant-numeric: tabular-nums; }
+  h1, h2, h3 { @apply font-display font-normal tracking-tight; }
+  :focus-visible { outline: 2px solid rgb(var(--accent-strong)); outline-offset: 3px; border-radius: 4px; }
+  ::selection { background: rgb(var(--accent) / 0.25); }
+}
+
+@layer components {
+  .btn { @apply inline-flex items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50; min-height: 44px; }
+  .btn-primary { @apply bg-accent text-on-accent hover:bg-accent-strong hover:text-on-accent; }
+  .dark .btn-primary:hover { filter: brightness(1.08); }
+  .btn-ghost { @apply border border-line bg-surface text-ink hover:bg-sunken; }
+  .chip { @apply inline-flex items-center rounded-full border border-line bg-surface px-2.5 py-0.5 text-xs text-ink; }
+  .chip-accent { @apply border-accent/40 bg-accent/10 text-accent-strong; }
+  .chip-gap { @apply border-dashed border-warn/70 text-warn; }
+  .card { @apply rounded-lg border border-line bg-surface; }
+  .label { @apply text-xs font-semibold uppercase tracking-[0.12em] text-muted; }
+  .skeleton { background: linear-gradient(90deg, rgb(var(--line) / 0.5) 25%, rgb(var(--line) / 0.9) 50%, rgb(var(--line) / 0.5) 75%); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; border-radius: 4px; }
+  .field { @apply w-full rounded-md border border-line bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-muted/80; min-height: 44px; }
+}
+
+@keyframes shimmer { to { background-position: -200% 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }
+}
+
+@keyframes jiggle {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(5px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(2px); }
+}

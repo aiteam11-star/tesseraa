@@ -1,0 +1,22 @@
+node_modules
+.next
+.env
+.env.local
+prisma/*.db
+prisma/*.db-journal
+next-env.d.ts
+*.tsbuildinfo
+
+# uploaded files (private storage)
+/storage
+
+# scratch databases
+*.db
+*.db-journal
+
+# throwaway local test scripts
+tmp-*.mjs
+
+# test output
+/test-results
+/playwright-report

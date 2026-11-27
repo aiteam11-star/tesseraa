@@ -1,0 +1,15 @@
+# Local PostgreSQL for development: `docker compose up -d`
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tessera
+      POSTGRES_PASSWORD: tessera
+      POSTGRES_DB: tessera
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - tessera-db:/var/lib/postgresql/data
+volumes:
+  tessera-db:

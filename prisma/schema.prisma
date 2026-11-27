@@ -1,0 +1,356 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Array and object fields are stored as JSON strings (kept simple and portable).
+// Use helpers in src/lib/json.ts to read and write them.
+
+model User {
+  id              String    @id @default(cuid())
+  name            String
+  email           String    @unique
+  role            String // the ACTIVE view: client | freelancer
+  roles           String    @default("") // every profile this person has, comma separated; empty means just `role`
+  hue             Int       @default(170)
+  // null for seeded sample accounts: they have no password, so nobody can sign in as them.
+  passwordHash    String?
+  isDemo          Boolean   @default(false)
+  // Set when the person clicks the link we email them. Null means the address is not confirmed yet.
+  emailVerifiedAt DateTime?
+  avatarFileId    String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @default(now()) @updatedAt
+
+  profile          FreelancerProfile?
+  clientProfile    ClientProfile?
+  projects         Project[]           @relation("ClientProjects")
+  messages         Message[]
+  thanksSent       ThankYou[]          @relation("ThanksFrom")
+  thanksReceived   ThankYou[]          @relation("ThanksTo")
+  sessions         Session[]
+  resets           PasswordReset[]
+  verifications    EmailVerification[]
+  files            FileAsset[]
+  activity         Activity[]
+  deliverableNotes DeliverableNote[]
+  savedProjects    SavedProject[]
+  savedFreelancers SavedFreelancer[]
+}
+
+// Server-side sessions. Only a SHA-256 of the cookie token is stored.
+model Session {
+  id        String   @id // sha256(token)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  userAgent String   @default("")
+
+  @@index([userId])
+}
+
+// Single-use link sent to confirm an email address. Only a SHA-256 of the token is stored.
+model EmailVerification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email     String // the address the link was sent to; stale if the user has since changed their email
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+model PasswordReset {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+// Metadata for uploaded files. Bytes live in private storage, never under /public.
+model FileAsset {
+  id        String   @id @default(cuid())
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  kind      String // avatar | resume | portfolio | attachment
+  name      String
+  mime      String
+  size      Int
+  path      String
+  // Set for kind "attachment": only the project's client and hired freelancer may read the file.
+  projectId String?
+  createdAt DateTime @default(now())
+
+  messages Message[]
+  notes    DeliverableNote[]
+
+  @@index([ownerId, kind])
+  @@index([projectId])
+}
+
+model ClientProfile {
+  id          String @id @default(cuid())
+  userId      String @unique
+  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company     String @default("")
+  website     String @default("")
+  industry    String @default("")
+  description String @default("")
+  location    String @default("")
+  timezone    String @default("")
+  tzOffset    Int    @default(-5)
+}
+
+model Activity {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        String
+  description String
+  href        String   @default("")
+  createdAt   DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model SavedProject {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, projectId])
+}
+
+model SavedFreelancer {
+  id           String            @id @default(cuid())
+  userId       String
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  freelancerId String
+  freelancer   FreelancerProfile @relation(fields: [freelancerId], references: [id], onDelete: Cascade)
+  createdAt    DateTime          @default(now())
+
+  @@unique([userId, freelancerId])
+}
+
+model Milestone {
+  id        String    @id @default(cuid())
+  projectId String
+  project   Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title     String
+  dueDate   DateTime
+  doneAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([projectId])
+}
+
+model FreelancerSkill {
+  id           String            @id @default(cuid())
+  freelancerId String
+  freelancer   FreelancerProfile @relation(fields: [freelancerId], references: [id], onDelete: Cascade)
+  name         String
+  proficiency  String            @default("intermediate") // beginner | intermediate | expert
+
+  @@unique([freelancerId, name])
+}
+
+model ProjectSkill {
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name      String
+
+  @@unique([projectId, name])
+}
+
+model FreelancerProfile {
+  id                       String    @id @default(cuid())
+  userId                   String    @unique
+  user                     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  headline                 String    @default("") // professional title
+  currentStatus            String    @default("") // student | recent_graduate | dropout | working_professional | full_time_freelancer | other
+  country                  String    @default("")
+  bio                      String    @default("")
+  category                 String    @default("")
+  yearsExperience          Int       @default(0)
+  hourlyRate               Int       @default(0) // 0 = not set
+  pricingModel             String    @default("hourly") // hourly | project
+  minProjectPrice          Int       @default(0)
+  timezone                 String    @default("")
+  tzOffset                 Int       @default(0)
+  availabilityHoursPerWeek Int       @default(0)
+  availabilityStatus       String    @default("available") // available | limited | unavailable
+  preferredStartDate       DateTime?
+  communicationStyle       String    @default("")
+  updateFrequency          String    @default("")
+  revisionApproach         String    @default("")
+  linkedinUrl              String    @default("")
+  portfolioUrl             String    @default("")
+  education                String    @default("")
+  certifications           String    @default("")
+  languages                String    @default("[]") // JSON string[]
+  resumeFileId             String?
+  updatedAt                DateTime  @default(now()) @updatedAt
+
+  skills     FreelancerSkill[]
+  sidequests Sidequest[]
+  portfolio  PortfolioItem[]
+  proposals  Proposal[]
+  hired      Project[]         @relation("HiredFreelancer")
+  savedBy    SavedFreelancer[]
+}
+
+model PortfolioItem {
+  id        String            @id @default(cuid())
+  profileId String
+  profile   FreelancerProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  title     String
+  problem   String
+  approach  String            @default("")
+  result    String            @default("")
+  tags      String            @default("[]") // JSON string[]
+  hue       Int               @default(170)
+  fileId    String? // optional uploaded image or document
+  shape     Int               @default(0)
+}
+
+model Project {
+  id               String             @id @default(cuid())
+  clientId         String
+  client           User               @relation("ClientProjects", fields: [clientId], references: [id], onDelete: Cascade)
+  title            String
+  rawBrief         String
+  structuredBrief  String // JSON
+  budget           Int
+  estimatedHours   Int
+  deadline         DateTime
+  deadlineDays     Int
+  minExperience    Int
+  clientTzOffset   Int                @default(-5)
+  status           String // draft | open | active | completed | cancelled
+  startDate        DateTime?
+  hiredAt          DateTime?
+  availabilityNote String             @default("")
+  updatedAt        DateTime           @default(now()) @updatedAt
+  hiredId          String?
+  hired            FreelancerProfile? @relation("HiredFreelancer", fields: [hiredId], references: [id])
+  createdAt        DateTime           @default(now())
+
+  skills       ProjectSkill[]
+  milestones   Milestone[]
+  deliverables Deliverable[]
+  saved        SavedProject[]
+  proposals    Proposal[]
+  messages     Message[]
+  thanks       ThankYou[]
+
+  @@index([clientId, status])
+  @@index([status])
+}
+
+model Proposal {
+  id           String            @id @default(cuid())
+  projectId    String
+  project      Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  freelancerId String
+  freelancer   FreelancerProfile @relation(fields: [freelancerId], references: [id], onDelete: Cascade)
+  coverNote    String            @default("")
+  price        Int               @default(0)
+  timelineDays Int               @default(0)
+  source       String            @default("application") // invitation | application
+  status       String // invited | sent | accepted | declined | withdrawn
+  createdAt    DateTime          @default(now())
+
+  @@unique([projectId, freelancerId])
+  @@index([freelancerId])
+}
+
+model Message {
+  id        String     @id @default(cuid())
+  projectId String
+  project   Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  senderId  String
+  sender    User       @relation(fields: [senderId], references: [id])
+  body      String
+  flags     String     @default("[]") // JSON string[] e.g. ["scopeCreep"]
+  meta      String     @default("{}") // JSON: scope analysis, mini-quote draft, quote status
+  fileId    String? // optional attachment
+  file      FileAsset? @relation(fields: [fileId], references: [id], onDelete: SetNull)
+  createdAt DateTime   @default(now())
+}
+
+model ThankYou {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  fromId    String
+  from      User     @relation("ThanksFrom", fields: [fromId], references: [id])
+  toId      String
+  to        User     @relation("ThanksTo", fields: [toId], references: [id])
+  note      String
+  sticker   String
+  createdAt DateTime @default(now())
+
+  @@unique([projectId, fromId])
+}
+
+// Side projects, hobby builds, hackathons: things freelancers do for the love of it.
+model Sidequest {
+  id          String            @id @default(cuid())
+  profileId   String
+  profile     FreelancerProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  title       String
+  description String            @default("")
+  url         String            @default("")
+  createdAt   DateTime          @default(now())
+
+  @@index([profileId])
+}
+
+// The shared workspace for an active project: what is being built, and the feedback loop around each piece.
+model Deliverable {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title     String
+  status    String   @default("todo") // todo | in_progress | in_review | changes_requested | approved
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  notes DeliverableNote[]
+
+  @@index([projectId])
+}
+
+model DeliverableNote {
+  id            String      @id @default(cuid())
+  deliverableId String
+  deliverable   Deliverable @relation(fields: [deliverableId], references: [id], onDelete: Cascade)
+  authorId      String
+  author        User        @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  kind          String // comment | start | submit | change_request | approve
+  body          String      @default("")
+  url           String      @default("")
+  fileId        String? // optional attached file (for example a submission)
+  file          FileAsset?  @relation(fields: [fileId], references: [id], onDelete: SetNull)
+  createdAt     DateTime    @default(now())
+
+  @@index([deliverableId])
+}
